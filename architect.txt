@@ -1,0 +1,232 @@
+IRON MERCHANT MANAGEMENT SYSTEM — ARCHITECTURE & BUILD PLAN
+===========================================================
+Source of truth: Iron_Merchant_Software_Core_Understanding.docx
+(Treat the spec's business rules as requirements; where code and spec
+conflict, spec wins.)
+
+LOCKED DECISIONS
+----------------
+- Build fresh; the earlier drafted SQL foundation is NOT reused.
+- Local dev first (Supabase CLI / local Postgres); cloud deploy deferred.
+- Product identity = diameter + grade/material + standard length +
+  wall thickness + theoretical weight-per-ft.
+- Scrap selling rate = manual entry per scrap sale, snapshotted on the line.
+- Additional landed costs (freight, handling) allocated BY WEIGHT,
+  remainder to the last received piece.
+- Precision: NUMERIC(18,4) for kg / ft / rates; 2dp PKR for money.
+  Line totals computed unrounded, rounded at the end; deterministic
+  remainder allocation so sums reconcile exactly.
+- First release EXCLUDES: discounts, customer/supplier returns, taxes,
+  withholding, credit limits. Corrections happen only via reversals.
+- Cash/bank: single Cash account + single Bank account.
+  Payment methods: cash, bank transfer, cheque.
+- Single business forever; no warehouse/branch tables. owner_id retained
+  on business data per spec (owner-scoped RLS).
+- Chart of accounts: seeded default set derived from spec section 9.1
+  (Cash, Bank, AR, AP, Shaft Inventory, Scrap Inventory, Sales Revenue,
+  Scrap Sales, COGS, Scrap COGS, Cutting Loss Expense, operating expense
+  accounts) and flagged for accountant sign-off before production.
+
+STACK
+-----
+- Frontend: Next.js App Router, React, TypeScript, Tailwind CSS.
+- Backend/DB: Supabase (local) PostgreSQL; constraints, views, RPC functions.
+- Auth: Supabase Auth, one owner/admin account.
+- Business logic: enforced inside PostgreSQL transactions — never in React.
+  Frontend calls narrowly scoped server actions / route handlers / RPCs.
+  Frontend NEVER writes stock balances, WAC, journal lines or balances directly.
+- Secrets: server-side environment variables only; no service-role key in browser.
+- Storage: Supabase Storage only for approved attachments (later, if required).
+
+REPO LAYOUT
+-----------
+supabase/migrations/*.sql     Schema + RPCs (one migration per logical change)
+supabase/seed.sql             Default CoA, business settings, doc sequences
+src/app/(dashboard)/...       App routes (see navigation below)
+src/lib/supabase/client.ts    Browser client (anon key only)
+src/lib/supabase/server.ts    Server client / service role (server-only)
+src/server/actions/*.ts       Server actions calling RPCs
+src/components/*               UI components
+tests/                        SQL/pgTAP tests + reconciliation scripts
+
+APP NAVIGATION (spec section 15)
+--------------------------------
+Dashboard | Inventory | Cutting Management | Purchases | Sales & Invoices |
+Customers | Suppliers | Payments & Expenses | Reports | Settings
+
+DATABASE ENTITIES (spec section 10)
+-----------------------------------
+business_settings, profiles, product_categories, products, product_pricing
+(effective-dated), customers, suppliers, inventory_pieces,
+product_stock_balances, product_cost_balances, purchases/purchase_items,
+cutting_records/cutting_outputs, scrap_lots, sales/sale_items,
+payments/payment_allocations, expense_categories/expenses,
+stock_movements, accounts/journal_entries/journal_lines,
+audit_logs, document_sequences
+
+KEY INTEGRITY RULES
+-------------------
+- UUID PKs; owner_id on business data; composite owner-scoped FKs.
+- CHECK constraints: positive lengths/weights/values, valid statuses,
+  exactly-one-of (inventory piece vs scrap lot) on a sale line.
+- UNIQUE: piece_code and document numbers within owner scope.
+- Row-level locks + consistent lock order for purchase receiving, cutting,
+  sales, payment allocation, reversals. No negative stock or cost balances.
+- Stock movements + journal entries created in the SAME transaction
+  as the business event. Append-only for confirmed transactions,
+  movements, journals, audit logs.
+- RLS enabled on EVERY owner-scoped table; audit insert-only for app user.
+- SECURITY INVOKER preferred; SECURITY DEFINER only with fixed safe
+  search_path + explicit auth/ownership validation.
+- Document numbering: document_sequences row-locked increment
+  (safe under concurrency). Default format INV-0001, configurable.
+
+PHASE PLAN (1 -> 9)
+-------------------
+Phase 1 — Database foundation
+  Migrations for all entities above; constraints; RLS on every table;
+  document_sequences; seed default CoA + owner profile; Auth wiring.
+  Exit gate: `supabase db reset` applies clean; RLS smoke tests pass.
+
+Phase 2 — Product & pricing management
+  Product CRUD (dia, grade, std length, wall thickness, wt/ft, category).
+  Effective-dated full/cut price list; overlap prevention via daterange
+  exclusion constraint; defined active-rate selection rule.
+  Product list/detail UI + price history view.
+
+Phase 3 — Inventory management
+  Individual piece records (piece_code, measured ft/kg, status,
+  carrying value, lineage refs, timestamps, owner).
+  Aggregate stock/cost balances updated only via RPCs.
+  Reconciliation view: aggregates vs SUM of eligible pieces.
+  Piece history (purchase -> cutting -> sale); inventory list/filter.
+
+Phase 4 — Purchase management + WAC
+  Purchase draft -> receiving (per-shaft ft/kg entry) -> CONFIRM RPC:
+  lock, create pieces, allocate landed cost by weight (remainder to last
+  piece), write stock movements, update product_cost_balances WAC,
+  supplier payable/payment stub, journal entries, audit — ONE transaction.
+  WAC formula: new WAC = (existing value + landed cost) / (existing kg + new kg).
+  Landed cost = purchase cost + allocated freight/handling.
+  Supplier master + purchase register UI.
+
+Phase 5 — Cutting & scrap management
+  CUT RPC: lock source piece; validate status full|cut and not reserved;
+  record outputs (actual measured ft/kg each); scrap -> scrap_lots;
+  variance (source kg - outputs kg - scrap kg) -> cutting_loss_expense if
+  real loss; source -> split; child pieces with parent lineage; cost
+  allocated by output weight across usable pieces + scrap; scrap EXCLUDED
+  from shaft WAC; journals + movements atomically; NO revenue, NO profit.
+  REVERSAL RPC: allowed only if ALL outputs and scrap are untouched
+  (unsold/uncut/available); otherwise blocked, corrective process required.
+  Cutting register, variance report, scrap stock view.
+
+Phase 6 — Sales & invoicing
+  SALE RPCs for (a) full piece, (b) cut piece, (c) scrap lot:
+  lock piece/lot; validate availability; snapshot rate+weight; line
+  amount = kg x rate; consume atomically; COGS at WAC (scrap at scrap
+  carrying cost); AR/Cash + Revenue + COGS(+Scrap COGS) journals;
+  piece -> sold.
+  Invoice lifecycle draft -> confirmed; invoice print/view;
+  rate snapshots immutable once confirmed.
+  Partial-length request = cut-then-sell in ONE atomic RPC.
+  Reversal = credit note transaction restoring stock/journals;
+  confirmed invoices are NEVER deleted.
+
+Phase 7 — Accounting
+  Default CoA seeded (Phase 1), pending accountant sign-off.
+  Balanced-entry validation (debits = credits) enforced by constraint/trigger.
+  PAYMENT RPC: direction (received/paid), party, method, reference;
+  allocate to multiple invoices/bills; partial payments; over-allocation
+  rejected; unallocated amount -> advance / unapplied credit (NOT forced
+  onto a document); allocation ledger is the ONLY basis for outstanding
+  balances (no manually editable balance fields, no "sales - receipts").
+  Customer & supplier ledgers/statements; expenses (category, paid ->
+  cash/bank, unpaid -> AP); confirmed expenses corrected by reversal only.
+  Supplier purchase payment integration.
+  Journal treatment (spec 9.1): credit sale DR AR/CR Revenue; COGS
+  DR COGS/CR Shaft Inventory; receipt DR Cash-Bank/CR AR (allocated part);
+  credit purchase DR Shaft Inventory/CR AP; supplier payment DR AP/CR
+  Cash-Bank; cutting = value transfer + cutting-loss if variance; scrap
+  sale DR Cash-AR/CR Scrap Sales and DR Scrap COGS/CR Scrap Inventory.
+
+Phase 8 — Reports & dashboard
+  Dashboard: stock kg (and ft) per product; WAC + total carrying value;
+  scrap qty/value; today's sales by type; purchases; receivables/payables;
+  cash/bank balances; gross profit indicators; low-stock flags.
+  Reports: inventory summary; piece history; cutting report
+  (source/outputs/scrap/variance); scrap stock & scrap sales; purchase
+  register; supplier statement; sales register; customer statement;
+  payment register + allocation details; expense report; stock valuation
+  & reconciliation; P&L, balance sheet, trial balance (after CoA).
+
+Phase 9 — Testing & deployment
+  Test matrix:
+   - RPC atomicity: forced mid-transaction failure rolls back fully.
+   - Concurrency: two sales of same piece — exactly one succeeds.
+   - Negative stock / negative cost balance rejected.
+   - WAC example from spec: 500 kg @ PKR 100,000 + 300 kg @ PKR 66,000
+     => WAC PKR 207.50/kg.
+   - Cutting reconciliation: outputs + scrap + variance = source,
+     under the 4dp/2dp rounding policy.
+   - Payments: partial, multi-invoice allocation, over-allocation
+     blocked, advance/unapplied credit handling.
+   - Reversal dependency blocks (cut reversed after child sold => blocked).
+   - RLS: non-owner cannot read/write; audit logs immutable.
+   - Journal balance invariant on every posted entry.
+  Reconciliation job: aggregates vs piece sums. Backup/restore drill.
+  Audit review; error handling; production cutover (hosted Supabase +
+  Vercel) ONLY after accountant signs off the CoA.
+
+ATOMIC WORKFLOWS (spec section 17) — ALL MUST SUCCEED OR FAIL AS ONE TX
+-----------------------------------------------------------------------
+1. Purchase confirmation: lock -> pieces -> stock/WAC -> payable/payment
+   -> journal -> movements/audit.
+2. Cutting confirmation: lock source -> validate -> cutting
+   record/outputs/scrap -> consume source -> shaft+scrap values ->
+   variance journal if needed -> movements/journal/audit.
+3. Full/cut sale: lock piece + cost balance -> validate -> snapshot
+   rate/weight -> invoice line -> piece sold -> reduce stock/value ->
+   AR/cash + revenue + COGS -> movements/audit.
+4. Scrap sale: lock scrap lot -> validate qty -> snapshot rate ->
+   reduce lot/value -> scrap sale + scrap COGS -> movements/journal/audit.
+5. Payment allocation: lock payment + target docs -> validate unallocated
+   & outstanding -> allocation -> cash/bank + AR/AP journal ->
+   derived balances.
+6. Reversal: validate dependencies -> compensating document + movements
+   -> reverse journals/allocations -> preserve originals.
+
+RISKS / WATCH ITEMS
+-------------------
+- Cut-then-sell atomicity: must be a single RPC, never two client calls.
+- Rounding remainder allocation must be deterministic (last piece /
+  last line) everywhere cost is split (purchases, cutting, WAC).
+- Effective-dated pricing: exclude overlapping dateranges (exclusion
+  constraint) and define which rate wins for a given date.
+- All balance/journal writes go through RPCs; no direct table writes
+  from the frontend.
+- Reversal logic is the bug-prone area; test every document type's
+  reversal path explicitly.
+- Treat any pre-existing SQL snippets as untrusted; spec wins.
+
+ASSUMPTIONS TO CONFIRM
+----------------------
+- Local-only until explicitly told otherwise; Supabase CLI for local dev.
+- Single owner user; no employee accounts/roles in scope.
+- Invoice numbering default INV-0001 (configurable in Settings).
+- Accountant must approve final CoA before production cutover.
+
+OPEN ITEMS FOR OWNER/ACCOUNTANT (spec section 21 — status)
+----------------------------------------------------------
+[x] Product identity: dia + grade + std length + wall thickness + wt/ft.
+[x] Scrap rate: manual per scrap sale (no price list).
+[x] Landed cost: weight-based allocation.
+[x] Precision: 4dp storage, 2dp money, 4dp calc with 2dp rounding,
+    deterministic remainder.
+[x] Discounts/returns/taxes/withholding/credit limits: EXCLUDED from v1.
+[x] Cash/bank: single Cash + single Bank; methods cash, bank transfer, cheque.
+[x] Multi-warehouse/branch/owner: never (schema stays single-business).
+[ ] Chart of accounts: default seeded; ACCOUNTANT SIGN-OFF REQUIRED
+    before production (cutover gate).
+
+END OF PLAN
