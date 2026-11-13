@@ -96,7 +96,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-function Brand({ businessName }: { businessName: string }) {
+function Brand({ businessName }: { businessName: ReactNode }) {
   return (
     <div className="flex items-center gap-3 px-2">
       <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-forest text-forest-on-container shadow-soft">
@@ -135,7 +135,7 @@ export default function AppShell({
   businessName,
   children,
 }: {
-  businessName: string;
+  businessName: ReactNode;
   children: ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);

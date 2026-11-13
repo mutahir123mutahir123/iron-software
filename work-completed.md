@@ -147,6 +147,11 @@ Verification: `npx tsc --noEmit` clean; `npm run lint` clean;
 dynamic). Dev server smoke: /login renders 200; /inventory returns 307
 (redirect to login when unauthenticated). Runtime UI test against the
 hosted project with the owner login not yet performed.
+- Fix after dev-console errors ("Date.now() unstable while prerendering
+  at AppLayout"): session read in (app)/layout.tsx moved into a
+  `<Suspense>` boundary (BusinessName component); AppShell now takes
+  `businessName: ReactNode`. Routes are now partial-prerendered (◐)
+  instead of blocking.
 
 ### Open items
 - Chart of accounts: seeded default — ACCOUNTANT SIGN-OFF REQUIRED before

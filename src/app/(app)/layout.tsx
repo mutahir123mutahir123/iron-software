@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import AuthGate from "@/components/auth-gate";
 import AppShell from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 // validation so the segment blocks on the server like a normal dynamic app.
 export const instant = false;
 
-export default async function AppLayout({ children }: { children: ReactNode }) {
+async function BusinessName() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -23,10 +23,21 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       .maybeSingle();
     businessName = data?.business_name ?? businessName;
   }
+  return <>{businessName}</>;
+}
 
+export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <AuthGate>
-      <AppShell businessName={businessName}>{children}</AppShell>
+      <AppShell
+        businessName={
+          <Suspense fallback="Iron Merchant">
+            <BusinessName />
+          </Suspense>
+        }
+      >
+        {children}
+      </AppShell>
     </AuthGate>
   );
 }
