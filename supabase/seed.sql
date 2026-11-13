@@ -1,0 +1,5 @@
+-- Phase 1 seed.
+-- Owner-scoped defaults (profile, business settings, document sequences,
+-- expense categories, default chart of accounts) are created automatically
+-- per owner by the public.handle_new_user() trigger on auth.users insert.
+-- Nothing global to seed here yet; add global reference data in later phases.
