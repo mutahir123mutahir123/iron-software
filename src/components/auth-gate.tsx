@@ -1,28 +1,36 @@
-import { Suspense, type ReactNode } from "react";
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+"use client";
 
-async function Gate({ children }: { children: ReactNode }) {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
+import { useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
-  if (!data.user) {
-    redirect("/login");
+export default function AuthGate({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const [isAuthorized, setIsAuthorized] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth
+      .getUser()
+      .then(({ data, error }) => {
+        if (error || !data.user) {
+          router.replace("/login");
+          return;
+        }
+        setIsAuthorized(true);
+      })
+      .catch(() => {
+        router.replace("/login");
+      });
+  }, [router]);
+
+  if (!isAuthorized) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-10 text-sm text-zinc-500">
+        Loading…
+      </div>
+    );
   }
 
   return <>{children}</>;
-}
-
-export default function AuthGate({ children }: { children: ReactNode }) {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex flex-1 items-center justify-center p-10 text-sm text-zinc-500">
-          Loading…
-        </div>
-      }
-    >
-      <Gate>{children}</Gate>
-    </Suspense>
-  );
 }

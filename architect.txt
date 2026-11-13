@@ -7,7 +7,11 @@ conflict, spec wins.)
 LOCKED DECISIONS
 ----------------
 - Build fresh; the earlier drafted SQL foundation is NOT reused.
-- Local dev first (Supabase CLI / local Postgres); cloud deploy deferred.
+- Hosted (remote) Supabase only; no local Docker stack. Migrations in
+  supabase/migrations/ are applied to the linked hosted project with
+  `supabase db push`. The CLI is used ONLY for remote operations
+  (migration list / db push), never to run a local stack.
+  (Phase 1 applied 2026-11-13; Phase 2 applied 2026-11-13.)
 - Product identity = diameter + grade/material + standard length +
   wall thickness + theoretical weight-per-ft.
 - Scrap selling rate = manual entry per scrap sale, snapshotted on the line.
@@ -30,7 +34,7 @@ LOCKED DECISIONS
 STACK
 -----
 - Frontend: Next.js App Router, React, TypeScript, Tailwind CSS.
-- Backend/DB: Supabase (local) PostgreSQL; constraints, views, RPC functions.
+- Backend/DB: Supabase (hosted project) PostgreSQL; constraints, views, RPC functions.
 - Auth: Supabase Auth, one owner/admin account.
 - Business logic: enforced inside PostgreSQL transactions — never in React.
   Frontend calls narrowly scoped server actions / route handlers / RPCs.
@@ -47,7 +51,7 @@ src/lib/supabase/client.ts    Browser client (anon key only)
 src/lib/supabase/server.ts    Server client / service role (server-only)
 src/server/actions/*.ts       Server actions calling RPCs
 src/components/*               UI components
-tests/                        SQL/pgTAP tests + reconciliation scripts
+tests/                        Reconciliation scripts + test matrix SQL checks
 
 APP NAVIGATION (spec section 15)
 --------------------------------
@@ -86,7 +90,8 @@ PHASE PLAN (1 -> 9)
 Phase 1 — Database foundation
   Migrations for all entities above; constraints; RLS on every table;
   document_sequences; seed default CoA + owner profile; Auth wiring.
-  Exit gate: `supabase db reset` applies clean; RLS smoke tests pass.
+  Exit gate: migrations applied to the hosted project (`supabase db push`);
+  RLS smoke tests pass (run as SQL against the hosted project).
 
 Phase 2 — Product & pricing management
   Product CRUD (dia, grade, std length, wall thickness, wt/ft, category).
@@ -211,7 +216,9 @@ RISKS / WATCH ITEMS
 
 ASSUMPTIONS TO CONFIRM
 ----------------------
-- Local-only until explicitly told otherwise; Supabase CLI for local dev.
+- No local Docker stack; the linked hosted Supabase project is the only
+  database. Supabase CLI is used only for remote operations
+  (`supabase migration list --remote`, `supabase db push --remote`).
 - Single owner user; no employee accounts/roles in scope.
 - Invoice numbering default INV-0001 (configurable in Settings).
 - Accountant must approve final CoA before production cutover.

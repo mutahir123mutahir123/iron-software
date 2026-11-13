@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Iron Merchant Management System
 
-## Getting Started
+Private, single-business management system for an iron/steel merchant.
+Source of truth for business rules: `Iron_Merchant_Software_Core_Understanding.docx`.
+Build plan: `architect.txt`.
 
-First, run the development server:
+## Stack
+
+- Next.js (App Router) + React + TypeScript + Tailwind CSS
+- Supabase (hosted project) — PostgreSQL, Auth, RLS
+- Business logic enforced in PostgreSQL transactions/RPCs, not in React
+
+## Database workflow (remote-only — no local Docker stack)
+
+The linked hosted Supabase project is the only database. Migrations live in
+`supabase/migrations/` and are applied with the Supabase CLI:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npx supabase migration list --remote   # check status
+npx supabase db push --remote          # apply pending migrations
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Default owner profile, business settings, document sequences, expense
+categories and the default chart of accounts are seeded automatically per
+owner by the `handle_new_user` trigger on signup.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+There is no local Supabase/Docker setup for this project.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Configuration
 
-## Learn More
+`.env.local` (never commit):
 
-To learn more about Next.js, take a look at the following resources:
+- `NEXT_PUBLIC_SUPABASE_URL` — hosted project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — anon key (browser-safe)
+- `SUPABASE_SERVICE_ROLE_KEY` — server-side only
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Development
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm install
+npm run dev    # http://localhost:3000
+npm run lint   # eslint
+npx tsc --noEmit
+npm run build
+```
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See `work-completed.md` for phase progress.
