@@ -15,7 +15,7 @@ export default function DeletePricingButton({ pricingId }: { pricingId: string }
           startTransition(() => deletePricing(pricingId));
         }
       }}
-      className="rounded-md px-2 py-1 text-xs font-medium text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/40"
+      className="rounded-md px-2 py-1 text-xs font-medium text-error-ink transition-colors hover:bg-error-soft/60 disabled:opacity-50"
     >
       {isPending ? "Removing…" : "Delete"}
     </button>

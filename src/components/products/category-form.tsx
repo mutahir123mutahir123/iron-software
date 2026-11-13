@@ -10,7 +10,7 @@ export default function CategoryForm() {
 
   return (
     <form action={formAction} className="flex flex-col gap-2">
-      <label htmlFor="name" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+      <label htmlFor="name" className="text-sm font-medium text-zinc-700">
         New category
       </label>
       <div className="flex gap-2">
@@ -19,18 +19,18 @@ export default function CategoryForm() {
           name="name"
           required
           placeholder="e.g. Saria, Angle, Channel, Pipe"
-          className="h-11 flex-1 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-600/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+          className="h-11 flex-1 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-600/20"
         />
         <button
           type="submit"
           disabled={isPending}
-          className="h-11 rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-zinc-700 disabled:opacity-60 dark:bg-amber-600 dark:text-zinc-950 dark:hover:bg-amber-500"
+          className="h-11 rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-zinc-700 disabled:opacity-60"
         >
           {isPending ? "Adding…" : "Add"}
         </button>
       </div>
       {state.error ? (
-        <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+        <p role="alert" className="text-sm text-error-ink">
           {state.error}
         </p>
       ) : null}

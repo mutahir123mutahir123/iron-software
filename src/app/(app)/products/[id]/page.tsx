@@ -47,28 +47,28 @@ export default async function ProductDetailPage({
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8">
-      <Link href="/products" className="text-sm text-zinc-500 hover:underline dark:text-zinc-400">
+      <Link href="/products" className="text-sm text-secondary hover:underline">
         ← Back to products
       </Link>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">{product.name}</h1>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+          <h1 className="font-display text-3xl font-semibold text-ink">{product.name}</h1>
+          <p className="mt-1 text-sm text-secondary">
             {formatNumber(product.diameter_mm)} mm · {product.grade} · std {formatNumber(product.standard_length_ft)} ft
             {!product.is_active ? " · Inactive" : ""}
           </p>
         </div>
-        <div className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-right dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        <div className="rounded-xl border border-sand bg-white px-4 py-2 text-right">
+          <p className="text-xs font-medium uppercase tracking-wide text-secondary">
             Rate today (PKR/kg)
           </p>
           {currentRate ? (
-            <p className="mt-0.5 text-lg font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">
+            <p className="mt-0.5 text-lg font-semibold tabular-nums text-ink">
               {formatRate(currentRate.full_rate)} full · {formatRate(currentRate.cut_rate)} cut
             </p>
           ) : (
-            <p className="mt-0.5 text-sm font-medium text-amber-700 dark:text-amber-500">
+            <p className="mt-0.5 text-sm font-medium text-forest">
               No price effective today
             </p>
           )}
@@ -76,8 +76,8 @@ export default async function ProductDetailPage({
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-5">
-        <section className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900 lg:col-span-3">
-          <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">Specification</h2>
+        <section className="rounded-xl border border-sand bg-white p-6 lg:col-span-3">
+          <h2 className="text-base font-semibold text-ink">Specification</h2>
           <div className="mt-4">
             <ProductForm
               categories={categories}
@@ -98,9 +98,9 @@ export default async function ProductDetailPage({
         </section>
 
         <section className="flex flex-col gap-6 lg:col-span-2">
-          <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-            <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">Add price</h2>
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          <div className="rounded-xl border border-sand bg-white p-6">
+            <h2 className="text-base font-semibold text-ink">Add price</h2>
+            <p className="mt-1 text-xs text-secondary">
               Date ranges may not overlap. The rate applicable on a date is the unique
               row whose range covers it.
             </p>
@@ -109,16 +109,16 @@ export default async function ProductDetailPage({
             </div>
           </div>
 
-          <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-            <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">Price history</h2>
+          <div className="rounded-xl border border-sand bg-white p-6">
+            <h2 className="text-base font-semibold text-ink">Price history</h2>
             {pricing.length === 0 ? (
-              <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="mt-3 text-sm text-secondary">
                 No prices configured yet. Full and cut sales will have no rate to snapshot.
               </p>
             ) : (
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full min-w-[420px] text-left text-sm">
-                  <thead className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <thead className="text-xs uppercase tracking-wide text-secondary">
                     <tr>
                       <th className="py-2 pr-3">From</th>
                       <th className="py-2 pr-3">To</th>
@@ -127,26 +127,26 @@ export default async function ProductDetailPage({
                       <th className="py-2" />
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                  <tbody className="divide-y divide-sand">
                     {pricing.map((row) => {
                       const isCurrent = row.id === currentRate?.id;
                       return (
                         <tr key={row.id}>
-                          <td className="py-2 pr-3 tabular-nums text-zinc-700 dark:text-zinc-300">
+                          <td className="py-2 pr-3 tabular-nums text-ink-soft">
                             {row.effective_from}
                             {isCurrent ? (
-                              <span className="ml-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
+                              <span className="ml-1 rounded-full bg-forest-fixed px-1.5 py-0.5 text-[10px] font-medium text-forest-ink">
                                 current
                               </span>
                             ) : null}
                           </td>
-                          <td className="py-2 pr-3 tabular-nums text-zinc-700 dark:text-zinc-300">
+                          <td className="py-2 pr-3 tabular-nums text-ink-soft">
                             {row.effective_to ?? "open"}
                           </td>
-                          <td className="py-2 pr-3 text-right tabular-nums text-zinc-700 dark:text-zinc-300">
+                          <td className="py-2 pr-3 text-right tabular-nums text-ink-soft">
                             {formatRate(row.full_rate)}
                           </td>
-                          <td className="py-2 pr-3 text-right tabular-nums text-zinc-700 dark:text-zinc-300">
+                          <td className="py-2 pr-3 text-right tabular-nums text-ink-soft">
                             {formatRate(row.cut_rate)}
                           </td>
                           <td className="py-2 text-right">

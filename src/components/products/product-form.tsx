@@ -35,8 +35,8 @@ const emptyValues: ProductFormValues = {
 const initialState: ProductFormState = { error: null };
 
 const inputClass =
-  "h-11 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-600/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100";
-const labelClass = "text-sm font-medium text-zinc-700 dark:text-zinc-300";
+  "h-11 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-600/20";
+const labelClass = "text-sm font-medium text-zinc-700";
 
 export default function ProductForm({
   categories,
@@ -172,13 +172,13 @@ export default function ProductForm({
             name="notes"
             rows={2}
             defaultValue={v.notes}
-            className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-600/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+            className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-600/20"
           />
         </div>
       </div>
 
       {isEdit ? (
-        <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+        <label className="flex items-center gap-2 text-sm text-zinc-700">
           <input
             type="checkbox"
             name="is_active"
@@ -192,7 +192,7 @@ export default function ProductForm({
       {state.error ? (
         <p
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/50 dark:text-red-400"
+          className="rounded-lg border border-error/30 bg-error-soft/60 px-3 py-2 text-sm text-error-ink"
         >
           {state.error}
         </p>
@@ -201,7 +201,7 @@ export default function ProductForm({
         <button
           type="submit"
           disabled={isPending}
-          className="h-11 rounded-lg bg-zinc-900 px-5 text-sm font-semibold text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-amber-600 dark:text-zinc-950 dark:hover:bg-amber-500"
+          className="h-11 rounded-lg bg-zinc-900 px-5 text-sm font-semibold text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isPending ? "Saving…" : isEdit ? "Save changes" : "Create product"}
         </button>

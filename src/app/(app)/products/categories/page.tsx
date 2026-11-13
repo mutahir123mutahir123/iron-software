@@ -20,27 +20,27 @@ export default async function CategoriesPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8">
-      <Link href="/products" className="text-sm text-zinc-500 hover:underline dark:text-zinc-400">
+      <Link href="/products" className="text-sm text-secondary hover:underline">
         ← Back to products
       </Link>
-      <h1 className="mt-2 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Product categories</h1>
-      <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+      <h1 className="mt-2 font-display text-3xl font-semibold text-ink">Product categories</h1>
+      <p className="mt-1 text-sm text-secondary">
         Group specifications such as Saria, Angle, Channel or Pipe. A category in
         use cannot be deleted until its products are reassigned.
       </p>
 
-      <div className="mt-6 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="mt-6 rounded-xl border border-sand bg-white p-6">
         <CategoryForm />
       </div>
 
-      <ul className="mt-4 divide-y divide-zinc-200 rounded-xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+      <ul className="mt-4 divide-y divide-sand rounded-xl border border-sand bg-white">
         {categories.map((c) => {
           const count = productCount.get(c.id) ?? 0;
           return (
             <li key={c.id} className="flex items-center justify-between gap-3 px-4 py-3">
               <div>
-                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{c.name}</p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                <p className="text-sm font-medium text-ink">{c.name}</p>
+                <p className="text-xs text-secondary">
                   {count} {count === 1 ? "product" : "products"}
                 </p>
               </div>
@@ -49,7 +49,7 @@ export default async function CategoriesPage() {
           );
         })}
         {categories.length === 0 ? (
-          <li className="px-4 py-10 text-center text-sm text-zinc-500 dark:text-zinc-400">
+          <li className="px-4 py-10 text-center text-sm text-secondary">
             No categories yet. Add one above.
           </li>
         ) : null}

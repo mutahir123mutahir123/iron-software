@@ -6,8 +6,8 @@ import { createPricing, type PricingFormState } from "@/server/actions/products"
 const initialState: PricingFormState = { error: null };
 
 const inputClass =
-  "h-11 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-600/20 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100";
-const labelClass = "text-sm font-medium text-zinc-700 dark:text-zinc-300";
+  "h-11 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-600/20";
+const labelClass = "text-sm font-medium text-zinc-700";
 
 function todayIso() {
   const now = new Date();
@@ -79,7 +79,7 @@ export default function PricingForm({ productId }: { productId: string }) {
       {state.error ? (
         <p
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/50 dark:text-red-400"
+          className="rounded-lg border border-error/30 bg-error-soft/60 px-3 py-2 text-sm text-error-ink"
         >
           {state.error}
         </p>
@@ -89,7 +89,7 @@ export default function PricingForm({ productId }: { productId: string }) {
         <button
           type="submit"
           disabled={isPending}
-          className="h-11 rounded-lg border border-zinc-900 px-4 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-600 dark:text-amber-500 dark:hover:bg-amber-600/10"
+          className="h-11 rounded-lg border border-zinc-900 px-4 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isPending ? "Saving…" : "Add price row"}
         </button>

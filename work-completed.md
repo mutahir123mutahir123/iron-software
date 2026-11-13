@@ -2,13 +2,13 @@
 
 Source plan: architect.txt (PHASE PLAN 1 -> 9)
 
-## Status: Phase 2 of 9 complete
+## Status: Phase 3 of 9 complete
 
 | Phase | Name | Status |
 |-------|------|--------|
 | 1 | Database foundation | ✅ Completed |
 | 2 | Product & pricing management | ✅ Completed |
-| 3 | Inventory management | ⬜ Pending |
+| 3 | Inventory management | ✅ Completed |
 | 4 | Purchase management + WAC | ⬜ Pending |
 | 5 | Cutting & scrap management | ⬜ Pending |
 | 6 | Sales & invoicing | ⬜ Pending |
@@ -90,6 +90,63 @@ Notes:
 Verification: `npx tsc --noEmit` clean; `npm run lint` clean;
 `npm run build` succeeds; `supabase migration list --remote` shows
 20261113000001-0004 all applied. No Docker/local Supabase used.
+
+## Phase 3 — Inventory management (Completed)
+
+Scope (per architect.txt):
+- Individual piece records list with search/filter (piece code, product,
+  status) and pagination
+- Aggregate stock/cost balances remain RPC-only; added a read-only
+  reconciliation view for drift detection
+- Piece history page: lineage (purchase -> cutting -> sale) and stock
+  movement timeline
+- Frontend restyled to the Stitch "Terra — Organic Design" system
+  (warm cream, forest green, Literata + Nunito Sans, 12px radius)
+
+Deliverables:
+- supabase/migrations/20261113000005_phase3_inventory.sql
+  - view public.inventory_reconciliation (security_invoker): per product,
+    aggregate stock/cost balances vs SUM of eligible pieces
+    (status full/cut/reserved) with piece counts and values
+  - Applied to the hosted project 2026-11-13 (`supabase db push --remote --yes`)
+- src/app/(app)/inventory/page.tsx — stats (carrying value + blended WAC,
+  sellable pieces/kg, scrap reserve, reconciliation status), filters,
+  paginated table with origin lineage (PO / CUT / parent piece)
+- src/app/(app)/inventory/[id]/page.tsx — piece detail: measurements,
+  carrying value, lineage (received via purchase / created by cutting /
+  consumed by cutting / parent / children / sold via invoice), movement
+  history timeline, product card
+- src/app/(app)/inventory/reconciliation/page.tsx — per-product and totals
+  comparison of balances vs pieces, OK/drift status
+- src/components/inventory/*.tsx — StatusChip, StatCard
+- Frontend-wide restyle to Terra: src/app/globals.css design tokens,
+  root layout fonts (Literata/Nunito Sans via next/font), sidebar app shell
+  (src/components/app-shell.tsx, mobile drawer), login page, dashboard,
+  products pages (zinc/amber removed everywhere; dark mode classes dropped —
+  the Stitch design is LIGHT-only)
+- src/lib/format.ts — added formatPkr / formatDate
+- Added @phosphor-icons/react (icon family per frontend taste rules; none
+  was installed)
+- (app)/layout.tsx exports `instant = false`: every route in the segment
+  reads the session cookie and per-user data, so instant-navigation
+  validation is opted out (blocking SSR, same as before cacheComponents)
+
+Notes:
+- No pieces exist in the hosted DB yet (purchases are Phase 4), so the
+  inventory pages show empty states with real zero/empty aggregates.
+- No manual "add piece" flow: pieces must be created by the purchase
+  confirmation RPC (Phase 4) to keep WAC and accounting consistent.
+- Stitch design features not implemented (no matching schema/steps):
+  yard bays, QR scanner, weighbridge telemetry, metallurgical compliance,
+  "+ Add Physical Piece", Export CSV. None are in Phase 3 scope.
+- Sidebar shows future modules (Cutting, Purchases, Sales, Customers,
+  Suppliers, Payments, Reports, Settings) as disabled "Soon" entries.
+
+Verification: `npx tsc --noEmit` clean; `npm run lint` clean;
+`npm run build` succeeds (all routes compile; /inventory and siblings are
+dynamic). Dev server smoke: /login renders 200; /inventory returns 307
+(redirect to login when unauthenticated). Runtime UI test against the
+hosted project with the owner login not yet performed.
 
 ### Open items
 - Chart of accounts: seeded default — ACCOUNTANT SIGN-OFF REQUIRED before

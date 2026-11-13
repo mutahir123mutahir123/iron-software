@@ -1,26 +1,55 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+  Terra — Organic Design (Stitch project 8225619837748269961)
+  Warm cream surfaces, forest green primary, Literata headlines,
+  Nunito Sans body. Light theme only — the Stitch design is LIGHT.
+*/
+@theme {
+  --color-cream: #faf6f0;
+  --color-card: #ffffff;
+  --color-parchment: #f5f1ea;
+  --color-sand: #f0ece4;
+  --color-linen: #eae6de;
+  --color-edge: #e4e0d8;
+  --color-shade: #dbd7cf;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-forest: #4a7c59;
+  --color-forest-deep: #3e6b4d;
+  --color-forest-ink: #002110;
+  --color-forest-fixed: #c8e8d0;
+  --color-forest-container: #78a886;
+  --color-forest-on-container: #d8f0de;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-ink: #2e3230;
+  --color-ink-soft: #4a4e4a;
+  --color-outline: #74796e;
+  --color-outline-soft: #c4c8bc;
+
+  --color-secondary: #6b6358;
+  --color-secondary-container: #f0e8db;
+  --color-secondary-on-container: #5e5548;
+
+  --color-umber: #705c30;
+  --color-umber-container: #c4a66a;
+  --color-umber-fixed: #f8e0a8;
+  --color-umber-fixed-dim: #dcc48e;
+  --color-umber-ink: #554020;
+
+  --color-error: #b83230;
+  --color-error-soft: #ffdad8;
+  --color-error-ink: #690005;
+
+  --font-display: var(--font-literata), Georgia, serif;
+  --font-sans: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-xl: 12px;
+  --shadow-soft: 0 4px 20px rgba(46, 50, 48, 0.06);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  line-height: 1.6;
 }
