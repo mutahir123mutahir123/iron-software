@@ -22,6 +22,7 @@ export type CuttablePiece = {
   measured_length_ft: number;
   measured_weight_kg: number;
   carrying_value: number;
+  product_id?: string;
   products: {
     name: string;
     grade: string;

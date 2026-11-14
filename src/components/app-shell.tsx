@@ -34,8 +34,8 @@ const navItems: NavItem[] = [
   { label: "Products", href: "/products", icon: SquaresFour },
   { label: "Cutting Management", href: "/cutting", icon: Scissors },
   { label: "Purchases", href: "/purchases", icon: ShoppingBag },
-  { label: "Sales & Invoices", icon: Receipt },
-  { label: "Customers", icon: Users },
+  { label: "Sales & Invoices", href: "/sales", icon: Receipt },
+  { label: "Customers", href: "/customers", icon: Users },
   { label: "Suppliers", href: "/suppliers", icon: Truck },
   { label: "Payments & Expenses", icon: Wallet },
   { label: "Reports", icon: ChartBar },
@@ -143,7 +143,7 @@ export default function AppShell({
   return (
     <div className="flex min-h-screen">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-[264px] shrink-0 flex-col gap-6 border-r border-sand bg-card px-4 py-6 lg:flex">
+      <aside className="sticky top-0 hidden h-screen print:hidden w-[264px] shrink-0 flex-col gap-6 border-r border-sand bg-card px-4 py-6 lg:flex">
         <Brand businessName={businessName} />
         <nav aria-label="Main navigation" className="flex-1 overflow-y-auto">
           <NavLinks />
@@ -152,7 +152,7 @@ export default function AppShell({
       </aside>
 
       {/* Mobile top bar */}
-      <div className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-sand bg-card/95 px-3 backdrop-blur lg:hidden">
+      <div className="fixed inset-x-0 top-0 z-40 print:hidden flex h-14 items-center justify-between border-b border-sand bg-card/95 px-3 backdrop-blur lg:hidden">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -179,7 +179,7 @@ export default function AppShell({
 
       {/* Mobile drawer */}
       {menuOpen ? (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-50 lg:hidden print:hidden">
           <button
             type="button"
             aria-label="Close navigation"
@@ -206,7 +206,7 @@ export default function AppShell({
         </div>
       ) : null}
 
-      <main className="min-w-0 flex-1 pt-14 lg:pt-0">{children}</main>
+      <main className="min-w-0 flex-1 pt-14 lg:pt-0 print:pt-0">{children}</main>
     </div>
   );
 }

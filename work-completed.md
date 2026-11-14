@@ -2,7 +2,7 @@
 
 Source plan: architect.txt (PHASE PLAN 1 -> 9)
 
-## Status: Phase 5 of 9 complete
+## Status: Phase 6 of 9 complete
 
 | Phase | Name | Status |
 |-------|------|--------|
@@ -11,7 +11,7 @@ Source plan: architect.txt (PHASE PLAN 1 -> 9)
 | 3 | Inventory management | ✅ Completed |
 | 4 | Purchase management + WAC | ✅ Completed |
 | 5 | Cutting & scrap management | ✅ Completed |
-| 6 | Sales & invoicing | ⬜ Pending |
+| 6 | Sales & invoicing | Completed |
 | 7 | Accounting | ⬜ Pending |
 | 8 | Reports & dashboard | ⬜ Pending |
 | 9 | Testing & deployment | ⬜ Pending |
@@ -331,3 +331,105 @@ Migration 20261114000007 applied to the hosted project 2026-11-14
   Phase 6 sales exist; RPC enforces it and the UI passes through the message.
 - Runtime UI smoke test against the hosted project not yet performed
   (needs owner login in a browser).
+
+## Phase 6 - Sales & invoicing (Completed)
+
+Scope (per architect.txt):
+- SALE RPCs for (a) full piece, (b) cut piece, (c) scrap lot: lock piece/lot;
+  validate availability; snapshot rate+weight; line amount = kg x rate; consume
+  atomically; COGS at carrying value (scrap at scrap cost); AR + Revenue +
+  COGS / Scrap COGS journals; piece -> sold.
+- Invoice lifecycle draft -> confirmed; invoice print view; rate snapshots
+  immutable once confirmed; reversal = credit note; confirmed invoices are
+  NEVER deleted.
+- Partial-length request = cut-then-sell in ONE atomic RPC (spec section 6.4).
+
+Decisions (confirmed by owner 2026-11-14):
+- Confirmation always posts to Accounts Receivable; customer payments are
+  recorded in Phase 7.
+- Invoices are single-type (full | cut | scrap); mixed-type invoices not allowed.
+- Full/cut rates pre-fill from the effective-dated price list (editable);
+  scrap rate is manual entry. The applied rate is snapshotted on the line.
+- Multi-line invoices supported.
+- sale_items_piece_key unique index DROPPED: it blocked re-sale of a piece
+  after a sale reversal. Uniqueness of consumption is enforced transactionally
+  (piece locked FOR UPDATE, must be status full|cut, then flips to sold).
+
+Deliverables:
+- supabase/migrations/20261114000008_phase6_sales.sql (applied 2026-11-14)
+  - RLS: sales/sale_items -> insert + select own, update/delete only while
+    status='draft'; purchase-style policies.
+  - confirm_sale(p_sale_id): lock sale + pieces/lots (pieces by id, then lots)
+    -> validate type match + line weights + recompute amounts (kg x rate,
+    unrounded inputs, rounded at the end) -> consume pieces / decrement scrap
+    lots (partial scrap sales supported) -> stock/cost balances per product
+    (product_id lock order) -> negative-balance guard -> stock movements ->
+    balanced journal (DR 1100 / CR 4000|4010, DR 5000|5010 / CR 1200|1210) ->
+    audit. ONE transaction.
+  - reverse_sale(p_sale_id): credit-note style; restores piece status
+    (full/cut), scrap lot remaining qty/value, aggregates, compensating journal
+    (reference_type sale_reversal); original never edited or deleted.
+  - confirm_cut_sale(...): cutting + sale of the designated output in ONE
+    transaction; two journals (cutting value transfer + sale). No revenue from
+    cutting; sale posts AR/Revenue/COGS atomically with the cut.
+- src/server/actions/sales.ts - draft CRUD, add/remove lines (server-side
+  validated; weights fixed to piece measurement; scrap weight editable with
+  lot remaining cap), confirm/reverse (RPC, P0001 -> friendly message),
+  cut-and-sell (RPC), audit logging.
+- src/server/actions/customers.ts - customer CRUD (delete blocked with
+  friendly error while sales reference the customer).
+- src/app/(app)/customers/ - list (search, active toggle), new, [id] (edit +
+  recent sales + danger zone).
+- src/app/(app)/sales/ - register (stats, status filter, search, pagination),
+  new/ (tabs: "Invoice existing stock" draft flow + "Cut & sell partial
+  length" atomic flow), [id]/ (draft editor + confirmed invoice view with
+  Print button, journal lines, print CSS hides app chrome).
+- src/components/sales/* - sale-form, add-sale-line-form (rate pre-fill from
+  price list), cut-and-sell-form (outputs editor + allocation preview + sold
+  output picker), confirm/reverse/delete/remove-line buttons, print-button.
+- src/components/customers/* - customer-form, delete-customer-button.
+- Sidebar: Sales & Invoices and Customers now enabled.
+
+Live verification on the hosted project (owner-approved, ZZ-TEST data, SQL
+with owner JWT claims set, same method as Phases 4/5):
+- Full-piece sale PC-0001 (100 kg @ 500): piece -> sold; Saria A stock
+  800 -> 700 kg / 8 -> 7 pcs / value 166,000 -> 146,000; sale journal balanced
+  (DR 1100 50,000 / CR 4000 50,000; DR 5000 20,000 / CR 1200 20,000)
+- Double-sell of PC-0001 rejected (P0001 'not available for a full sale');
+  failed test rolled back cleanly (no orphan draft)
+- reverse_sale(INV-0001): baseline restored exactly (800 / 8 / 166,000);
+  piece full; sale_reversal journal balanced (mirror image)
+- confirm_cut_sale on PC-0002 (outputs 60 kg + 40 kg, sell 60 kg @ 600):
+  CUT-0003 + INV-0002 in one transaction; source split; PC-0015 sold /
+  PC-0016 cut with 8,000.00 remaining; stock 740 / 8 pcs / 154,000; both
+  journals balanced
+- reverse_sale then reverse_cutting (CUT-0003): exact baseline restored
+- Scrap sale INV-0003 (2 kg of SL-0003 @ 300, partial lot): lot 5 -> 3 kg /
+  1,000 -> 600; journal DR 1100 600 / CR 4010 600; DR 5010 400 / CR 1210 400
+- reverse_sale then reverse_cutting (CUT-0004): PC-0003 restored full;
+  SL-0003 scrapped; baseline 800 / 8 / 166,000 restored
+- Re-sale of PC-0001 after reversal (INV-0004, @ 550) confirmed then reversed -
+  proves the dropped sale_items_piece_key index was required
+- Global journal invariant: zero unbalanced entries across purchase, cutting,
+  sale and reversal reference types
+- inventory_reconciliation: OK for both ZZ-TEST products (balances == pieces)
+
+Verification: `npx tsc --noEmit` clean; `npm run lint` clean; `npm run build`
+succeeds (all routes compile; /sales and /customers routes dynamic /
+partial-prerendered). Migration 20261114000008 applied to the hosted project
+2026-11-14 (`supabase db push --remote --yes`); `supabase migration list
+--remote` shows 20261113000001-20261114000008 all applied. No Docker/local
+Supabase used.
+
+### Known issues / open items
+- ZZ-TEST artifacts from Phase 6 (ZZ-TEST customer, INV-0001..0004 reversed,
+  CUT-0003/0004 reversed, PC-0015-0017 scrapped, SL-0003 scrapped) remain on
+  the hosted project; wipe with the Phase 4/5 ZZ-TEST data before real use.
+- Payment allocation to invoices (partial payments, multi-invoice allocation,
+  advances) is Phase 7; confirmed invoices carry no paid/unpaid tracking yet.
+- Purchase landed-cost allocation rounding-cap edge case from Phase 4 still
+  open (carried; not in Phase 6 scope).
+- Runtime UI smoke test against the hosted project still not performed (needs
+  owner login in a browser). Print view uses browser print; no PDF export.
+- Cut-and-sell posts the cutting journal (Shaft Inventory debit for the full
+  children value) and the sale journal; both balanced by the invariant trigger.
