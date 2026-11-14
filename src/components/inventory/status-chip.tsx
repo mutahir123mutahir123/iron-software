@@ -8,6 +8,7 @@ const statusStyles: Record<string, string> = {
   available: "bg-forest-fixed text-forest-ink",
   draft: "bg-umber-fixed text-umber-ink",
   confirmed: "bg-forest-fixed text-forest-ink",
+  posted: "bg-forest-fixed text-forest-ink",
   cancelled: "bg-error-soft text-error-ink",
   reversed: "bg-error-soft text-error-ink",
 };

@@ -2,7 +2,7 @@
 
 Source plan: architect.txt (PHASE PLAN 1 -> 9)
 
-## Status: Phase 6 of 9 complete
+## Status: Phase 7 of 9 complete
 
 | Phase | Name | Status |
 |-------|------|--------|
@@ -11,8 +11,8 @@ Source plan: architect.txt (PHASE PLAN 1 -> 9)
 | 3 | Inventory management | ✅ Completed |
 | 4 | Purchase management + WAC | ✅ Completed |
 | 5 | Cutting & scrap management | ✅ Completed |
-| 6 | Sales & invoicing | Completed |
-| 7 | Accounting | ⬜ Pending |
+| 6 | Sales & invoicing | ✅ Completed |
+| 7 | Accounting | ✅ Completed |
 | 8 | Reports & dashboard | ⬜ Pending |
 | 9 | Testing & deployment | ⬜ Pending |
 
@@ -324,14 +324,9 @@ Migration 20261114000007 applied to the hosted project 2026-11-14
 
 ### Known issues / open items
 - Phase 4 purchase landed-cost allocation shares the same rounding-cap edge case
-  fixed here for cutting (many items + tiny additional costs could theoretically
-  push the last item's allocation negative and violate CHECK >= 0). Not fixed in
-  Phase 5 (out of scope); flag for a small Phase 4 follow-up.
-- Reversal blocked path (child already sold/cut) cannot be exercised until
-  Phase 6 sales exist; RPC enforces it and the UI passes through the message.
-- Runtime UI smoke test against the hosted project not yet performed
-  (needs owner login in a browser).
-
+  fixed in Phase 5 for cutting (many items + tiny additional costs could theoretically
+  push the last item's allocation negative and violate CHECK >= 0). Not fixed yet;
+  flag for a small Phase 4 follow-up.
 ## Phase 6 - Sales & invoicing (Completed)
 
 Scope (per architect.txt):
@@ -422,14 +417,141 @@ partial-prerendered). Migration 20261114000008 applied to the hosted project
 Supabase used.
 
 ### Known issues / open items
-- ZZ-TEST artifacts from Phase 6 (ZZ-TEST customer, INV-0001..0004 reversed,
-  CUT-0003/0004 reversed, PC-0015-0017 scrapped, SL-0003 scrapped) remain on
-  the hosted project; wipe with the Phase 4/5 ZZ-TEST data before real use.
-- Payment allocation to invoices (partial payments, multi-invoice allocation,
-  advances) is Phase 7; confirmed invoices carry no paid/unpaid tracking yet.
+- ZZ-TEST artifacts from Phase 6 (ZZ-TEST customer, INV-0001..0006 — INV-0005/0006
+  reversed in Phase 7 verification — reversed; CUT-0003/0004 reversed; PC-0015-0017
+  scrapped; SL-0003 scrapped) remain on the hosted project; wipe with the Phase
+  4/5 ZZ-TEST data before real use.
+- Payment allocation shipped in Phase 7; confirmed invoices now carry
+  allocated/outstanding tracking (payment-status card + statements).
 - Purchase landed-cost allocation rounding-cap edge case from Phase 4 still
   open (carried; not in Phase 6 scope).
 - Runtime UI smoke test against the hosted project still not performed (needs
   owner login in a browser). Print view uses browser print; no PDF export.
 - Cut-and-sell posts the cutting journal (Shaft Inventory debit for the full
   children value) and the sale journal; both balanced by the invariant trigger.
+
+
+## Phase 7 — Accounting (Completed)
+
+Scope (per architect.txt):
+- PAYMENT RPC: direction (received/paid), party, method, reference; allocation to
+  multiple invoices/bills; partial payments; over-allocation rejected; unallocated
+  amount stays as advance / unapplied credit (NOT forced onto a document); the
+  allocation ledger is the ONLY basis for outstanding balances.
+- Customer & supplier ledgers/statements (receivable/payable, advances, full
+  invoice/bill + payment history).
+- Expenses: category, paid -> cash/bank, unpaid (credit) -> Accounts Payable;
+  confirmed expenses corrected by reversal only.
+- Supplier purchase payment integration (bill allocation via payments).
+- Journal treatments per spec §9.1 (sales, COGS, receipts, purchases, supplier
+  payments, cutting, scrap) already post from Phases 4–6; Phase 7 adds
+  payment/advance/expense journals.
+
+Decisions (confirmed by owner 2026-11-14):
+- Live verification via a temporary atomic verify migration (owner chose this
+  option). The verify file was removed afterwards and migration history was
+  repaired (`supabase migration repair --status reverted 20261114000010 --remote`);
+  ZZ-TEST artifacts (payments PAY-0001..0004, expenses) remain REVERSED on the
+  hosted project by design.
+- New ledger accounts: 1050 Supplier Advances (asset), 2050 Customer Advances
+  (liability); seeded for existing owners via migration and for future owners via
+  handle_new_user().
+- expense_categories gained account_id (mapped: Rent->6100, Utilities->6110,
+  Office & Admin->6120, Transport & Freight->6130, all others->6190). Categories
+  without a mapping fall back to 6190 Miscellaneous Expense.
+- payments, payment_allocations, expenses and accounts are now select-only for
+  the authenticated role; all writes happen inside SECURITY DEFINER RPCs
+  (same pattern as journals since Phase 1).
+- Payment reversal unwinds the payment entirely (allocations and unallocated
+  remainder both disappear; outstanding figures recompute from remaining posted
+  payments). Allocations are preserved, never deleted.
+- allocate_payment applies the unapplied remainder of an existing payment to a
+  document later (DR Customer Advances / CR AR, or DR AP / CR Supplier
+  Advances); no cash moves at that point.
+- Invoices/bills receive allocations only when status = 'confirmed'; allocations
+  from reversed payments are ignored by all balances/views.
+
+Deliverables:
+- supabase/migrations/20261114000009_phase7_accounting.sql — new accounts,
+  expense_categories.account_id + backfill, RLS tightening, views
+  public.customer_balances / public.supplier_balances (security_invoker;
+  outstanding = confirmed total − posted allocations; advance = posted payment
+  remainder), public.account_id_by_code helper, and RPCs record_payment /
+  allocate_payment / reverse_payment / post_expense / reverse_expense.
+  Applied to the hosted project 2026-11-14 (`supabase db push --remote --yes`).
+- src/server/ledger.ts — shared outstanding-document/payment queries
+  (getOpenSales, getOpenPurchases, getPayments; posted allocations only for
+  balance math).
+- src/server/actions/payments.ts — createPayment (RPC record_payment),
+  allocatePayment, reversePayment; allocations arrive as hidden JSON and are
+  re-validated by the RPC.
+- src/server/actions/expenses.ts — postExpense, reverseExpense,
+  addExpenseCategory, deleteExpenseCategory (delete blocked while in use).
+- src/app/(app)/payments/page.tsx — register (stats: received/paid posted
+  totals, unapplied advances; direction filter, search, pagination).
+- src/app/(app)/payments/new/page.tsx — direction toggle (received/paid),
+  party select (customer/supplier), outstanding-docs checklist with per-doc
+  amounts (capped at outstanding), live allocated/unapplied-advance summary.
+- src/app/(app)/payments/[id]/page.tsx — detail: allocations, unapplied
+  advance, "Apply advance" form (open docs for the party), journal lines,
+  two-step reverse.
+- src/app/(app)/expenses/page.tsx — register (stats + filter + pagination),
+  inline reversal, category manager (account code per category).
+- src/app/(app)/expenses/new/page.tsx — post expense (paid -> cash/bank
+  journal; "on account" -> Accounts Payable).
+- src/components/payments/*, src/components/expenses/* — payment-form,
+  reverse-payment-button, apply-advance-form, payments-tabs, expense-form,
+  category-form, delete-category-button, reverse-expense-button.
+- src/components/ledger-statement.tsx — statement of account (invoices/bills
+  table with allocated/outstanding, receipts/payments table, outstanding &
+  advance tiles); customer & supplier detail pages now show it in place of
+  "Recent sales/purchases".
+- src/components/payment-status-card.tsx — "Payment status" card (Allocated /
+  Outstanding + Record payment CTA) added to confirmed invoice and purchase
+  views.
+- src/components/inventory/status-chip.tsx — added 'posted' style.
+- Sidebar: Payments & Expenses now enabled (/payments; Expenses via tabs).
+
+Live verification on the hosted project (2026-11-14), via a temporary atomic
+verify migration applying owner-approved ZZ-TEST scenarios inside one
+transaction (any failed assertion aborts everything; on success the file was
+removed and migration history repaired):
+- Created two ZZ-TEST invoices (PC-0004/PC-0005, INV-0005/0006 @ 500) via the
+  draft flow + confirm_sale; over-allocation to an invoice rejected (P0001);
+  PAY-0001 (60,000 cash, 50,000 to INV-0005) -> allocated 50,000 / advance
+  10,000; customer_balances showed advance 10,000; allocate_payment moved the
+  10,000 advance to INV-0006 (advance -> 0); allocation beyond the unapplied
+  balance rejected; allocations exceeding the payment amount rejected;
+  full-advance payment recorded then reversed; reverse_payment restored
+  outstanding 100,000 / allocated 0; reverse_sale restored both pieces to stock
+- Supplier side: over-allocation of bill C1 rejected; multi-bill payment
+  PAY-0003 (200,000 across ZZTEST-A1/B1/C1 = 197,000) -> allocated 197,000 /
+  advance 3,000; supplier_balances outstanding 0; reversed; separate
+  partial-then-allocate flow (50,000 bank, 40,000 to A1) -> advance 10,000
+- Expenses: cash expense (DR 6100 / CR 1000), credit expense (DR 6190 / CR
+  2000), bank expense (DR 6190 / CR 1010), all reversed via reverse_expense
+- Global invariant: zero unbalanced journal entries across every reference type
+- Note: one verify-migration run failed mid-way on a wrong assertion of mine
+  (advance after payment reversal) — aborted atomically, NO partial data was
+  written; corrected and re-applied successfully
+- One design confirmation from the failed run: reversing a payment excludes it
+  ENTIRELY (its unallocated remainder vanishes with its allocations); only
+  posted payments count toward advances and outstanding figures
+- ZZ-TEST payments (PAY-0001..0004) and expenses remain on the hosted project,
+  all reversed; wipe with the rest of the ZZ-TEST data before real use
+
+Verification: `npx tsc --noEmit` clean; `npm run lint` clean; `npm run build`
+succeeds (34/34 pages; /payments, /payments/new, /payments/[id], /expenses,
+/expenses/new all compile). Dev-server smoke: /login 200; all new routes return
+307 (redirect to login) on the owner's dev server. No Docker/local Supabase used.
+
+### Known issues / open items
+- Phase 4 purchase landed-cost allocation rounding-cap edge case still open
+  (carried; not in Phase 7 scope).
+- Reversing a sale/purchase that has payment allocations does not auto-reverse
+  those payments (allocations are ignored via payment status; the owner should
+  reverse the payment explicitly). UI notes this on the sale reversal panel.
+- Expense → account mapping editable only in the database (seeded defaults);
+  no accountant-facing mapping UI yet (out of scope).
+- Runtime UI smoke test against the hosted project still not performed (needs
+  owner login in a browser).

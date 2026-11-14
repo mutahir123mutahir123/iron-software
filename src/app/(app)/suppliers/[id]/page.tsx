@@ -7,7 +7,11 @@ import { createClient } from "@/lib/supabase/server";
 export const instant = false;
 import SupplierForm from "@/components/suppliers/supplier-form";
 import DeleteSupplierButton from "@/components/suppliers/delete-supplier-button";
-import { formatDate } from "@/lib/format";
+import LedgerStatement, {
+  type StatementDoc,
+  type StatementPayment,
+} from "@/components/ledger-statement";
+import { getOpenPurchases, getPayments } from "@/server/ledger";
 
 export default async function SupplierDetailPage({
   params,
@@ -18,20 +22,47 @@ export default async function SupplierDetailPage({
   await connection();
   const supabase = await createClient();
 
-  const [supplierResult, purchasesResult] = await Promise.all([
+  const [supplierResult, openPurchases, paidPayments, balancesResult] = await Promise.all([
     supabase.from("suppliers").select("*").eq("id", id).maybeSingle(),
+    getOpenPurchases(supabase),
+    getPayments(supabase, "paid"),
     supabase
-      .from("purchases")
-      .select("id, purchase_number, purchase_date, status, total_cost")
+      .from("supplier_balances")
+      .select("outstanding, advance")
       .eq("supplier_id", id)
-      .order("purchase_date", { ascending: false })
-      .limit(10),
+      .maybeSingle(),
   ]);
 
   const supplier = supplierResult.data;
   if (!supplier) notFound();
 
-  const purchases = purchasesResult.data ?? [];
+  const docs: StatementDoc[] = openPurchases
+    .filter((d) => d.party_id === id)
+    .map((d) => ({
+      id: d.id,
+      number: d.number,
+      date: d.date,
+      total: d.total,
+      allocated: d.allocated,
+      outstanding: d.outstanding,
+      href: `/purchases/${d.id}`,
+    }));
+
+  const payments: StatementPayment[] = paidPayments
+    .filter((p) => p.supplier_id === id)
+    .map((p) => ({
+      id: p.id,
+      number: p.payment_number,
+      date: p.payment_date,
+      amount: p.amount,
+      allocated: p.allocated,
+      unallocated: p.unallocated,
+      status: p.status,
+      href: `/payments/${p.id}`,
+    }));
+
+  const outstanding = Number(balancesResult.data?.outstanding ?? 0);
+  const advance = Number(balancesResult.data?.advance ?? 0);
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-8">
@@ -53,47 +84,13 @@ export default async function SupplierDetailPage({
         />
       </div>
 
-      <section className="mt-6 rounded-xl border border-sand bg-white p-6">
-        <h2 className="text-base font-semibold text-ink">Recent purchases</h2>
-        {purchases.length === 0 ? (
-          <p className="mt-3 text-sm text-secondary">No purchases from this supplier yet.</p>
-        ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[520px] text-left text-sm">
-              <thead className="text-xs uppercase tracking-wide text-secondary">
-                <tr>
-                  <th className="py-2 pr-3">Number</th>
-                  <th className="py-2 pr-3">Date</th>
-                  <th className="py-2 pr-3">Status</th>
-                  <th className="py-2 pr-3 text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-sand">
-                {purchases.map((p) => (
-                  <tr key={p.id}>
-                    <td className="py-2 pr-3">
-                      <Link
-                        href={`/purchases/${p.id}`}
-                        className="font-medium text-forest hover:underline"
-                      >
-                        {p.purchase_number}
-                      </Link>
-                    </td>
-                    <td className="py-2 pr-3 text-ink-soft">{formatDate(p.purchase_date)}</td>
-                    <td className="py-2 pr-3 text-ink-soft">{p.status}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums text-ink-soft">
-                      {Number(p.total_cost).toLocaleString("en-PK", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      <LedgerStatement
+        kind="supplier"
+        docs={docs}
+        payments={payments}
+        outstanding={outstanding}
+        advance={advance}
+      />
 
       <section className="mt-6 rounded-xl border border-error/20 bg-white p-6">
         <h2 className="text-base font-semibold text-ink">Danger zone</h2>

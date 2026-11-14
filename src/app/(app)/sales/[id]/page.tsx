@@ -17,6 +17,7 @@ import ReverseSaleButton from "@/components/sales/reverse-sale-button";
 import DeleteSaleButton from "@/components/sales/delete-sale-button";
 import PrintButton from "@/components/sales/print-button";
 import StatusChip from "@/components/inventory/status-chip";
+import PaymentStatusCard from "@/components/payment-status-card";
 
 type LineRow = {
   id: string;
@@ -47,7 +48,7 @@ export default async function SaleDetailPage({
   await connection();
   const supabase = await createClient();
 
-  const [saleResult, linesResult, customersResult] = await Promise.all([
+  const [saleResult, linesResult, customersResult, allocationsResult] = await Promise.all([
     supabase
       .from("sales")
       .select("*, customers(name, phone, address)")
@@ -61,6 +62,11 @@ export default async function SaleDetailPage({
       .eq("sale_id", id)
       .order("created_at"),
     supabase.from("customers").select("id, name").eq("is_active", true).order("name"),
+    supabase
+      .from("payment_allocations")
+      .select("amount, payments!inner(status)")
+      .eq("sale_id", id)
+      .eq("payments.status", "posted"),
   ]);
 
   const sale = saleResult.data;
@@ -143,6 +149,11 @@ export default async function SaleDetailPage({
   }));
 
   const customer = sale.customers as { name: string; phone: string | null; address: string | null } | null;
+
+  const allocated = ((allocationsResult.data ?? []) as { amount: number }[]).reduce(
+    (sum, row) => sum + Number(row.amount),
+    0,
+  );
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 print:py-0 print:max-w-none">
@@ -386,6 +397,18 @@ export default async function SaleDetailPage({
               never change with later price-list updates.
             </p>
           </div>
+
+          {sale.status === "confirmed" ? (
+            <PaymentStatusCard
+              total={Number(sale.total)}
+              allocated={allocated}
+              recordHref={
+                sale.customer_id
+                  ? `/payments/new?direction=received&party_id=${sale.customer_id}`
+                  : "/payments/new?direction=received"
+              }
+            />
+          ) : null}
 
           {isDraft ? (
             <div className="flex flex-col gap-3 rounded-xl border border-sand bg-white p-6 print:hidden">

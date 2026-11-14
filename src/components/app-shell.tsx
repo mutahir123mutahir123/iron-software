@@ -37,7 +37,7 @@ const navItems: NavItem[] = [
   { label: "Sales & Invoices", href: "/sales", icon: Receipt },
   { label: "Customers", href: "/customers", icon: Users },
   { label: "Suppliers", href: "/suppliers", icon: Truck },
-  { label: "Payments & Expenses", icon: Wallet },
+  { label: "Payments & Expenses", href: "/payments", icon: Wallet },
   { label: "Reports", icon: ChartBar },
   { label: "Settings", icon: GearSix },
 ];

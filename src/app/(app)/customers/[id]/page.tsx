@@ -7,7 +7,11 @@ import { createClient } from "@/lib/supabase/server";
 export const instant = false;
 import CustomerForm from "@/components/customers/customer-form";
 import DeleteCustomerButton from "@/components/customers/delete-customer-button";
-import { formatDate, formatPkr } from "@/lib/format";
+import LedgerStatement, {
+  type StatementDoc,
+  type StatementPayment,
+} from "@/components/ledger-statement";
+import { getOpenSales, getPayments } from "@/server/ledger";
 
 export default async function CustomerDetailPage({
   params,
@@ -18,20 +22,47 @@ export default async function CustomerDetailPage({
   await connection();
   const supabase = await createClient();
 
-  const [customerResult, salesResult] = await Promise.all([
+  const [customerResult, openSales, receivedPayments, balancesResult] = await Promise.all([
     supabase.from("customers").select("*").eq("id", id).maybeSingle(),
+    getOpenSales(supabase),
+    getPayments(supabase, "received"),
     supabase
-      .from("sales")
-      .select("id, sale_number, sale_date, status, total")
+      .from("customer_balances")
+      .select("outstanding, advance")
       .eq("customer_id", id)
-      .order("sale_date", { ascending: false })
-      .limit(10),
+      .maybeSingle(),
   ]);
 
   const customer = customerResult.data;
   if (!customer) notFound();
 
-  const sales = salesResult.data ?? [];
+  const docs: StatementDoc[] = openSales
+    .filter((d) => d.party_id === id)
+    .map((d) => ({
+      id: d.id,
+      number: d.number,
+      date: d.date,
+      total: d.total,
+      allocated: d.allocated,
+      outstanding: d.outstanding,
+      href: `/sales/${d.id}`,
+    }));
+
+  const payments: StatementPayment[] = receivedPayments
+    .filter((p) => p.customer_id === id)
+    .map((p) => ({
+      id: p.id,
+      number: p.payment_number,
+      date: p.payment_date,
+      amount: p.amount,
+      allocated: p.allocated,
+      unallocated: p.unallocated,
+      status: p.status,
+      href: `/payments/${p.id}`,
+    }));
+
+  const outstanding = Number(balancesResult.data?.outstanding ?? 0);
+  const advance = Number(balancesResult.data?.advance ?? 0);
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-8">
@@ -53,44 +84,13 @@ export default async function CustomerDetailPage({
         />
       </div>
 
-      <section className="mt-6 rounded-xl border border-sand bg-white p-6">
-        <h2 className="text-base font-semibold text-ink">Recent sales</h2>
-        {sales.length === 0 ? (
-          <p className="mt-3 text-sm text-secondary">No sales for this customer yet.</p>
-        ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[520px] text-left text-sm">
-              <thead className="text-xs uppercase tracking-wide text-secondary">
-                <tr>
-                  <th className="py-2 pr-3">Number</th>
-                  <th className="py-2 pr-3">Date</th>
-                  <th className="py-2 pr-3">Status</th>
-                  <th className="py-2 pr-3 text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-sand">
-                {sales.map((s) => (
-                  <tr key={s.id}>
-                    <td className="py-2 pr-3">
-                      <Link
-                        href={`/sales/${s.id}`}
-                        className="font-medium text-forest hover:underline"
-                      >
-                        {s.sale_number}
-                      </Link>
-                    </td>
-                    <td className="py-2 pr-3 text-ink-soft">{formatDate(s.sale_date)}</td>
-                    <td className="py-2 pr-3 text-ink-soft">{s.status}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums text-ink-soft">
-                      {formatPkr(s.total)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      <LedgerStatement
+        kind="customer"
+        docs={docs}
+        payments={payments}
+        outstanding={outstanding}
+        advance={advance}
+      />
 
       <section className="mt-6 rounded-xl border border-error/20 bg-white p-6">
         <h2 className="text-base font-semibold text-ink">Danger zone</h2>

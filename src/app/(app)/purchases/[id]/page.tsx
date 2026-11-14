@@ -12,6 +12,7 @@ import DeleteItemButton from "@/components/purchases/delete-item-button";
 import ConfirmPurchaseButton from "@/components/purchases/confirm-purchase-button";
 import DeletePurchaseButton from "@/components/purchases/delete-purchase-button";
 import StatusChip from "@/components/inventory/status-chip";
+import PaymentStatusCard from "@/components/payment-status-card";
 
 type ItemRow = {
   id: string;
@@ -37,7 +38,7 @@ export default async function PurchaseDetailPage({
   await connection();
   const supabase = await createClient();
 
-  const [purchaseResult, itemsResult, suppliersResult, productsResult] = await Promise.all([
+  const [purchaseResult, itemsResult, suppliersResult, productsResult, allocationsResult] = await Promise.all([
     supabase
       .from("purchases")
       .select("*, suppliers(name)")
@@ -56,10 +57,20 @@ export default async function PurchaseDetailPage({
       .select("id, name, grade, diameter_mm")
       .eq("is_active", true)
       .order("name"),
+    supabase
+      .from("payment_allocations")
+      .select("amount, payments!inner(status)")
+      .eq("purchase_id", id)
+      .eq("payments.status", "posted"),
   ]);
 
   const purchase = purchaseResult.data;
   if (!purchase) notFound();
+
+  const allocated = ((allocationsResult.data ?? []) as { amount: number }[]).reduce(
+    (sum, row) => sum + Number(row.amount),
+    0,
+  );
 
   const isDraft = purchase.status === "draft";
   const items = (itemsResult.data ?? []) as unknown as ItemRow[];
@@ -409,6 +420,14 @@ export default async function PurchaseDetailPage({
               </div>
             ) : null}
           </div>
+
+          {!isDraft ? (
+            <PaymentStatusCard
+              total={Number(purchase.total_cost)}
+              allocated={allocated}
+              recordHref={`/payments/new?direction=paid&party_id=${purchase.supplier_id}`}
+            />
+          ) : null}
 
           {isDraft ? (
             <div className="flex flex-col gap-3 rounded-xl border border-sand bg-white p-6">
