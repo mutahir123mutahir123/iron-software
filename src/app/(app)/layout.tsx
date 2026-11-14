@@ -1,4 +1,5 @@
 import { Suspense, type ReactNode } from "react";
+import { connection } from "next/server";
 import AuthGate from "@/components/auth-gate";
 import AppShell from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
@@ -9,6 +10,9 @@ import { createClient } from "@/lib/supabase/server";
 export const instant = false;
 
 async function BusinessName() {
+  // Prerendering stops here; the Supabase client (and its Date.now() calls)
+  // runs only at request time, inside the Suspense boundary above.
+  await connection();
   const supabase = await createClient();
   const {
     data: { user },

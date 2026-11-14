@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { ArrowLeft, Scales, CheckCircle, WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/server";
 import { formatNumber, formatPkr } from "@/lib/format";
@@ -7,6 +8,7 @@ const KG_TOLERANCE = 0.005;
 const VALUE_TOLERANCE = 0.5;
 
 export default async function ReconciliationPage() {
+  await connection();
   const supabase = await createClient();
   const { data } = await supabase
     .from("inventory_reconciliation")
