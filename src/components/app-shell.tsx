@@ -32,7 +32,7 @@ const navItems: NavItem[] = [
   { label: "Dashboard", href: "/", icon: House },
   { label: "Inventory", href: "/inventory", icon: Package },
   { label: "Products", href: "/products", icon: SquaresFour },
-  { label: "Cutting Management", icon: Scissors },
+  { label: "Cutting Management", href: "/cutting", icon: Scissors },
   { label: "Purchases", href: "/purchases", icon: ShoppingBag },
   { label: "Sales & Invoices", icon: Receipt },
   { label: "Customers", icon: Users },

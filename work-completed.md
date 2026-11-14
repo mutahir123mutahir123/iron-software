@@ -2,7 +2,7 @@
 
 Source plan: architect.txt (PHASE PLAN 1 -> 9)
 
-## Status: Phase 4 of 9 complete
+## Status: Phase 5 of 9 complete
 
 | Phase | Name | Status |
 |-------|------|--------|
@@ -10,7 +10,7 @@ Source plan: architect.txt (PHASE PLAN 1 -> 9)
 | 2 | Product & pricing management | ✅ Completed |
 | 3 | Inventory management | ✅ Completed |
 | 4 | Purchase management + WAC | ✅ Completed |
-| 5 | Cutting & scrap management | ⬜ Pending |
+| 5 | Cutting & scrap management | ✅ Completed |
 | 6 | Sales & invoicing | ⬜ Pending |
 | 7 | Accounting | ⬜ Pending |
 | 8 | Reports & dashboard | ⬜ Pending |
@@ -239,3 +239,95 @@ project via SQL with the owner JWT claims set:
   all balanced (difference 0.00)
 - 11 stock movements (purchase_in, 1,100 kg / PKR 197,000); audit confirm logs written
 - ZZ-TEST data KEPT on the hosted project per owner request; wipe before real use.
+
+## Phase 5 — Cutting & scrap management (Completed)
+
+Scope (per architect.txt):
+- CUT RPC: lock source piece; validate status full|cut (reserved blocked);
+  record outputs (actual measured ft/kg each); scrap -> scrap_lots;
+  variance (source kg - outputs kg - scrap kg) -> cutting_loss_expense if real loss;
+  source -> split; child pieces with parent lineage; cost allocated by output
+  weight across usable pieces + scrap; scrap EXCLUDED from shaft WAC; journals +
+  movements atomically; NO revenue, NO profit.
+- REVERSAL RPC: allowed only if ALL outputs and scrap are untouched
+  (unsold/uncut/available); otherwise blocked with a corrective-process message.
+- Cutting register, variance report, scrap stock view.
+
+Decisions (confirmed/derived):
+- Cutting is a single-step confirmed operation (no draft stage; cutting_records
+  has no draft status). Reversal restores the source's prior status
+  ('full' if it has no parent, else 'cut').
+- Value allocation: variance >= 0 -> scrap and cutting loss are each rounded
+  to 2dp first (by source kg), children split the remainder by weight.
+  variance < 0 (unexplained gain) -> loss = 0, whole value scaled across
+  outputs + scrap by weight. All child shares capped at the remaining pot;
+  the LAST output carries the deterministic remainder. Outputs + scrap +
+  loss always reconcile exactly to the source carrying value.
+- Children with a rounding remainder still reconcile exactly (no negative shares).
+- cutting_records unique (owner_id, source_piece_id) replaced by a PARTIAL
+  unique index on confirmed rows only — a source can be re-cut after reversal.
+- New document sequence 'scrap' (SL-) for scrap lot numbering.
+- cutting_records / cutting_outputs / scrap_lots are now select-only for app
+  users; all writes happen inside the SECURITY DEFINER RPCs.
+- WAC: balances updated as aggregate value/kg deltas (children in, source out);
+  scrap value never enters shaft cost balances.
+
+Deliverables:
+- supabase/migrations/20261114000007_phase5_cutting.sql
+  - scrap sequence (SL-) for existing owners; handle_new_user() updated
+  - partial unique index cutting_records_one_confirmed_per_source
+  - RLS: cutting_records/cutting_outputs/scrap_lots -> select-only
+  - confirm_cutting(p_source_piece_id, p_cut_date, p_reference, p_notes,
+    p_outputs jsonb, p_scrap_kg) — one transaction: lock source -> validate ->
+    allocate -> record outputs -> create PC- child pieces (parent lineage) ->
+    scrap lot (SL-) -> consume source -> shaft balances (scrap excluded) ->
+    movements -> balanced journal (DR 1200/1210/6000 / CR 1200) -> audit
+  - reverse_cutting(p_cutting_record_id) — lock, validate all outputs status='cut'
+    and scrap untouched -> restore source -> retire children (status scrapped,
+    value 0) and scrap lot -> aggregates restored -> reversal movements ->
+    compensating journal (reference_type cutting_reversal, mirror image) -> audit.
+    Originals are never deleted.
+- src/server/actions/cutting.ts — createCutting (validates + RPC, redirects to
+  detail), reverseCutting (RPC); outputs parsed from a hidden JSON input
+- src/app/(app)/cutting/page.tsx — register (stats, search, status filter, pagination)
+- src/app/(app)/cutting/new/page.tsx + src/components/cutting/new-cutting-form.tsx —
+  source picker, dynamic output rows, scrap input, live reconciliation preview
+  (mirrors the RPC, labeled preview-only), inline two-step confirm
+- src/app/(app)/cutting/[id]/page.tsx — detail: source, outputs (piece links),
+  scrap lot card, reconciliation check, journal entry lines, reversal panel
+- src/app/(app)/cutting/variance/page.tsx — variance report (loss/gain cuts,
+  totals confirmed-only, reversed cuts excluded from totals)
+- src/app/(app)/cutting/scrap/page.tsx — scrap stock view (stats, status filter)
+- src/components/cutting/reverse-cutting-button.tsx — two-step confirm with
+  RPC error passthrough (blocked reversals show the reason)
+- Sidebar: Cutting Management enabled (/cutting)
+
+Live verification on the hosted project (owner-approved, ZZ-TEST data, SQL with
+owner JWT claims, mirroring Phase 4's method):
+- Cut PC-0001 (100 kg / PKR 20,000) into 35 kg + 60 kg + 3 kg scrap, 2 kg loss:
+  children allocated 7,000.00 / 12,000.00; scrap 600.00; loss 400.00;
+  pot exactly 20,000 traced. Movements, scrap lot SL-0001, balances
+  800->795 kg / 318 ft / 9 pcs / value PKR 165,000 all matched piece sums
+- Double-cut of same source rejected (P0001 'not available for cutting')
+- reversal of CUT-0001 restored source to full + exact pre-cut balances
+  (800/320/8/166,000) and journals mirrored (20,000 DR/CR, all 4 entries balanced)
+- Re-cut after reversal (CUT-0002) succeeded — partial unique index works
+- CUT-0002 reversed; baseline restored; reconciliation view matches for both
+  ZZ-TEST products; all test journals balanced
+- ZZ-TEST CUT-0001/CUT-0002 rows remain on the hosted project; wipe with the
+  Phase 4 ZZ-TEST data before real use
+
+Verification: `npx tsc --noEmit` clean; `npm run lint` clean; `npm run build`
+succeeds (all routes compile; /cutting* are dynamic/partial-prerendered).
+Migration 20261114000007 applied to the hosted project 2026-11-14
+(`supabase db push --remote --yes`). No Docker/local Supabase used.
+
+### Known issues / open items
+- Phase 4 purchase landed-cost allocation shares the same rounding-cap edge case
+  fixed here for cutting (many items + tiny additional costs could theoretically
+  push the last item's allocation negative and violate CHECK >= 0). Not fixed in
+  Phase 5 (out of scope); flag for a small Phase 4 follow-up.
+- Reversal blocked path (child already sold/cut) cannot be exercised until
+  Phase 6 sales exist; RPC enforces it and the UI passes through the message.
+- Runtime UI smoke test against the hosted project not yet performed
+  (needs owner login in a browser).
