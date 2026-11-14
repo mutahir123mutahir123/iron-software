@@ -2,14 +2,14 @@
 
 Source plan: architect.txt (PHASE PLAN 1 -> 9)
 
-## Status: Phase 3 of 9 complete
+## Status: Phase 4 of 9 complete
 
 | Phase | Name | Status |
 |-------|------|--------|
 | 1 | Database foundation | ✅ Completed |
 | 2 | Product & pricing management | ✅ Completed |
 | 3 | Inventory management | ✅ Completed |
-| 4 | Purchase management + WAC | ⬜ Pending |
+| 4 | Purchase management + WAC | ✅ Completed |
 | 5 | Cutting & scrap management | ⬜ Pending |
 | 6 | Sales & invoicing | ⬜ Pending |
 | 7 | Accounting | ⬜ Pending |
@@ -158,3 +158,71 @@ hosted project with the owner login not yet performed.
   production cutover (Phase 9 gate).
 - Runtime UI smoke test against the hosted project not yet performed
   (needs owner login in a browser).
+
+## Phase 4 — Purchase management + WAC (Completed)
+
+Scope (per architect.txt):
+- Purchase draft -> receiving (per-shaft ft/kg entry) -> CONFIRM RPC
+- confirm_purchase: lock draft -> validate -> landed-cost allocation by weight
+  (remainder to last item) -> create inventory_pieces (PC- codes from the new
+  `piece` document sequence) -> upsert product_stock_balances +
+  product_cost_balances (locked by product in product_id order) ->
+  stock_movements -> balanced journal (DR 1200 Shaft Inventory /
+  CR 2000 Accounts Payable) -> audit log. ONE transaction.
+- WAC is derived as value/kg from the balances (no separate stored WAC column).
+- Supplier master + purchase register UI
+
+Decisions (confirmed by owner 2026-11-14):
+- Confirmation always posts to Accounts Payable; payment happens in Phase 7.
+- Per-item purchase cost entered manually (not rate x kg).
+- piece_code auto-generated via sequence (PC-0001...); not user-editable.
+- Purchase reversal deferred to a later phase.
+- No changes to existing tables beyond RLS policy tightening and the new sequence.
+
+Deliverables:
+- supabase/migrations/20261114000006_phase4_purchases.sql
+  - `piece` document sequence inserted for existing owners; handle_new_user()
+    updated so future owners get it too
+  - RLS: purchases/purchase_items -> insert + select own, update/delete only
+    while status='draft' (items: only while parent purchase is a draft);
+    inventory_pieces -> select-only for authenticated (RPC-created only).
+    Aggregates/movements/journals remain RPC-only as before.
+  - confirm_purchase(p_purchase_id) SECURITY DEFINER RPC with row locks in
+    product_id order; deterministic weight-based allocation; reconciles exactly
+- src/server/parse.ts — shared numeric form parsers
+- src/server/actions/purchases.ts — create/update/delete draft, add/remove
+  item, confirmPurchase (RPC, error mapping: P0001 -> friendly message);
+  audit logging on draft CRUD
+- src/server/actions/suppliers.ts — supplier CRUD; delete blocked with a
+  friendly error while purchases reference the supplier (FK restrict)
+- src/app/(app)/purchases/page.tsx — register (stats, status filter, search,
+  pagination)
+- src/app/(app)/purchases/new/page.tsx — create draft (redirects to detail)
+- src/app/(app)/purchases/[id]/page.tsx — draft editor (header form, add/remove
+  shaft rows, live totals + per-product WAC preview) and read-only confirmed
+  view (items with allocated landed cost, piece links, journal entry lines)
+- src/app/(app)/suppliers/ — list, new, [id] (edit + danger-zone delete),
+  recent purchases table
+- src/components/purchases/*.tsx, src/components/suppliers/*.tsx
+- Sidebar: Purchases and Suppliers now enabled (no longer "Soon")
+- StatusChip: added draft/confirmed/cancelled/reversed styles
+
+Notes:
+- Drafts consume a purchase number at creation (PUR-0001...); gaps possible if
+  a draft is deleted. Piece codes are consumed only at confirmation.
+- Landed-cost preview shown in the UI mirrors the RPC (weight-based,
+  remainder to last item); the RPC assignment is authoritative.
+- Purchase reversal and supplier payment allocation are NOT part of this
+  phase (Phase 7). Confirmed purchases cannot be edited or deleted.
+- Runtime smoke test against the hosted project with the owner login still
+  not performed. No test purchase has been created on the hosted DB (it would
+  create permanent pieces + journal entries).
+
+Verification: `npx tsc --noEmit` clean; `npm run lint` clean; `npm run build`
+succeeds (all routes compile; /purchases and /suppliers are dynamic).
+Migration 20261114000006 applied to the hosted project 2026-11-14
+(`supabase db push --remote --yes`); `supabase migration list --remote` shows
+20261113000001-20261114000006 all applied. No Docker/local Supabase used.
+WAC example from the spec (500 kg @ PKR 100,000 + 300 kg @ PKR 66,000 =>
+PKR 207.50/kg) has NOT been exercised yet — it requires a confirmed test
+purchase and was left out to avoid permanent test data on the hosted project.

@@ -6,6 +6,10 @@ const statusStyles: Record<string, string> = {
   sold: "bg-shade text-ink-soft",
   scrapped: "bg-error-soft text-error-ink",
   available: "bg-forest-fixed text-forest-ink",
+  draft: "bg-umber-fixed text-umber-ink",
+  confirmed: "bg-forest-fixed text-forest-ink",
+  cancelled: "bg-error-soft text-error-ink",
+  reversed: "bg-error-soft text-error-ink",
 };
 
 export default function StatusChip({ status }: { status: string }) {
