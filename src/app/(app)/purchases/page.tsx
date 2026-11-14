@@ -9,7 +9,11 @@ import {
   CircleDashed,
   CheckCircle,
 } from "@phosphor-icons/react/dist/ssr";
+import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+
+// Blocks on request-time data (session + per-user queries); opt out of instant-navigation validation, like the (app) layout.
+export const instant = false;
 import { formatDate, formatPkr } from "@/lib/format";
 import StatCard from "@/components/inventory/stat-card";
 import StatusChip from "@/components/inventory/status-chip";
@@ -48,6 +52,7 @@ export default async function PurchasesPage({
   const statusFilter = statusFilters.some((s) => s.value === status) ? (status ?? "") : "";
   const currentPage = Math.max(1, Number(page) || 1);
 
+  await connection();
   const supabase = await createClient();
   const { data } = await supabase
     .from("purchases")

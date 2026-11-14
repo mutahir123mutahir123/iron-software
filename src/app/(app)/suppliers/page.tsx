@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { Plus, MagnifyingGlass } from "@phosphor-icons/react/dist/ssr";
+import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+
+// Blocks on request-time data (session + per-user queries); opt out of instant-navigation validation, like the (app) layout.
+export const instant = false;
 
 export default async function SuppliersPage({
   searchParams,
@@ -11,6 +15,7 @@ export default async function SuppliersPage({
   const query = (q ?? "").trim().toLowerCase();
   const showInactive = show === "all";
 
+  await connection();
   const supabase = await createClient();
   const { data: suppliers } = await supabase
     .from("suppliers")

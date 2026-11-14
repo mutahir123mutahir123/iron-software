@@ -12,7 +12,11 @@ import {
   ShoppingCart,
   NotePencil,
 } from "@phosphor-icons/react/dist/ssr";
+import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+
+// Blocks on request-time data (session + per-user queries); opt out of instant-navigation validation, like the (app) layout.
+export const instant = false;
 import { formatNumber, formatPkr, formatRate, formatDate } from "@/lib/format";
 import StatusChip from "@/components/inventory/status-chip";
 
@@ -22,6 +26,7 @@ export default async function PieceDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  await connection();
   const supabase = await createClient();
 
   const pieceResult = await supabase

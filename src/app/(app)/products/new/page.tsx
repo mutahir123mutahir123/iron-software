@@ -1,8 +1,13 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+
+// Blocks on request-time data (session + per-user queries); opt out of instant-navigation validation, like the (app) layout.
+export const instant = false;
 import ProductForm from "@/components/products/product-form";
 
 export default async function NewProductPage() {
+  await connection();
   const supabase = await createClient();
   const { data: categories } = await supabase
     .from("product_categories")

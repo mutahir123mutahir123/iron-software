@@ -1,9 +1,14 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+
+// Blocks on request-time data (session + per-user queries); opt out of instant-navigation validation, like the (app) layout.
+export const instant = false;
 import CategoryForm from "@/components/products/category-form";
 import DeleteCategoryButton from "@/components/products/delete-category-button";
 
 export default async function CategoriesPage() {
+  await connection();
   const supabase = await createClient();
   const [categoriesResult, productsResult] = await Promise.all([
     supabase.from("product_categories").select("id, name, created_at").order("name"),

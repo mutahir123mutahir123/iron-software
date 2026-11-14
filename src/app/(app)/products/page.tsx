@@ -1,5 +1,9 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+
+// Blocks on request-time data (session + per-user queries); opt out of instant-navigation validation, like the (app) layout.
+export const instant = false;
 import { formatNumber, formatRate } from "@/lib/format";
 
 type PricingRow = {
@@ -17,6 +21,7 @@ export default async function ProductsPage({
   const query = (q ?? "").trim().toLowerCase();
   const showInactive = show === "all";
 
+  await connection();
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
 

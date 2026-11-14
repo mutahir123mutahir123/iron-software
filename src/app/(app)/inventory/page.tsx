@@ -10,7 +10,11 @@ import {
   CaretLeft,
   CaretRight,
 } from "@phosphor-icons/react/dist/ssr";
+import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+
+// Blocks on request-time data (session + per-user queries); opt out of instant-navigation validation, like the (app) layout.
+export const instant = false;
 import { formatNumber, formatPkr, formatRate } from "@/lib/format";
 import StatusChip from "@/components/inventory/status-chip";
 import StatCard from "@/components/inventory/stat-card";
@@ -54,6 +58,7 @@ export default async function InventoryPage({
   const from = (currentPage - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
+  await connection();
   const supabase = await createClient();
 
   const [

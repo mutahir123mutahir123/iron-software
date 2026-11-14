@@ -2,6 +2,9 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { ArrowLeft, Scales, CheckCircle, WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/server";
+
+// Blocks on request-time data (session + per-user queries); opt out of instant-navigation validation, like the (app) layout.
+export const instant = false;
 import { formatNumber, formatPkr } from "@/lib/format";
 
 const KG_TOLERANCE = 0.005;

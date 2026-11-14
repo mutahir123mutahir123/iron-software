@@ -157,6 +157,9 @@ hosted project with the owner login not yet performed.
 - Chart of accounts: seeded default — ACCOUNTANT SIGN-OFF REQUIRED before
   production cutover (Phase 9 gate).
 - Runtime UI smoke test against the hosted project not yet performed
+- Throwaway test data (ZZ-TEST purchases A1/B1/C1, products, supplier, pieces
+  PC-0001..PC-0011) is LIVE on the hosted project by owner decision — wipe it
+  before the first real business transaction.
   (needs owner login in a browser).
 
 ## Phase 4 — Purchase management + WAC (Completed)
@@ -223,6 +226,16 @@ succeeds (all routes compile; /purchases and /suppliers are dynamic).
 Migration 20261114000006 applied to the hosted project 2026-11-14
 (`supabase db push --remote --yes`); `supabase migration list --remote` shows
 20261113000001-20261114000006 all applied. No Docker/local Supabase used.
-WAC example from the spec (500 kg @ PKR 100,000 + 300 kg @ PKR 66,000 =>
-PKR 207.50/kg) has NOT been exercised yet — it requires a confirmed test
-purchase and was left out to avoid permanent test data on the hosted project.
+
+Throwaway test data (owner-approved, 2026-11-14) verified against the hosted
+project via SQL with the owner JWT claims set:
+- Spec WAC example EXACT: Saria A 500 kg @ PKR 100,000 + 300 kg @ PKR 66,000
+  => WAC PKR 207.50/kg, stock 800 kg / PKR 166,000
+- Landed-cost allocation with rounding remainder: freight PKR 1,000 across
+  three equal shafts => 333.33 / 333.33 / 333.34, item values reconcile
+  exactly to PKR 31,000
+- Reconciliation view: aggregates vs piece sums match for both test products
+- Journals per purchase: DR 1200 Shaft Inventory / CR 2000 Accounts Payable,
+  all balanced (difference 0.00)
+- 11 stock movements (purchase_in, 1,100 kg / PKR 197,000); audit confirm logs written
+- ZZ-TEST data KEPT on the hosted project per owner request; wipe before real use.

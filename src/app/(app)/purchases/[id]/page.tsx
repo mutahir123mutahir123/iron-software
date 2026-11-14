@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+
+// Blocks on request-time data (session + per-user queries); opt out of instant-navigation validation, like the (app) layout.
+export const instant = false;
 import { formatDate, formatNumber, formatPkr, formatRate } from "@/lib/format";
 import PurchaseForm from "@/components/purchases/purchase-form";
 import AddItemForm from "@/components/purchases/add-item-form";
@@ -30,6 +34,7 @@ export default async function PurchaseDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  await connection();
   const supabase = await createClient();
 
   const [purchaseResult, itemsResult, suppliersResult, productsResult] = await Promise.all([
